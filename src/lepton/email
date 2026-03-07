@@ -1,0 +1,314 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import subprocess
+import textwrap
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+class Cache:
+    """XDG-compliant cache for storing email-related files and state."""
+
+    def __init__(self):
+        self.dir = (
+            Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "email"
+        )
+        self.dir.mkdir(parents=True, exist_ok=True)
+
+    def read(self, key):
+        """Return the cached value for key, or None if not found."""
+        f = self.dir / key
+        return f.read_text().strip() if f.exists() else None
+
+    def write(self, key, value):
+        """Persist a value to the cache under the given key."""
+        (self.dir / key).write_text(value)
+
+    def clear(self):
+        """Delete all files in the cache directory."""
+        for f in self.dir.iterdir():
+            f.unlink()
+
+
+_cache = Cache()
+
+DEFAULT_PROXY = "http://127.0.0.1:8082"
+
+
+class Net:
+    """HTTP client with optional proxy support."""
+
+    def __init__(self, proxy: str | None = DEFAULT_PROXY):
+        self.proxy = proxy
+        handlers = [
+            urllib.request.ProxyHandler(
+                {"http": proxy, "https": proxy} if proxy else {}
+            )
+        ]
+        self.opener = urllib.request.build_opener(*handlers)
+
+    def get(self, req):
+        """Open a URL and return the response. Exits with a message on connection failure."""
+        try:
+            return self.opener.open(req)
+        except urllib.error.URLError as e:
+            msg = (
+                f"no proxy found: {self.proxy}" if self.proxy else "connection refused"
+            )
+            raise SystemExit(msg) from e
+
+    def retrieve(self, url, dest):
+        """Download a URL to a local file."""
+        try:
+            with self.get(url) as res:
+                Path(dest).write_bytes(res.read())
+        except SystemExit:
+            raise
+
+
+class Proton:
+    """Manages the ProtonMail Bridge installation, updates, and service lifecycle."""
+
+    GPG_KEY_ID = "E2C75D68E6234B07"
+    SERVICE_COMMANDS = {"enable", "disable", "status", "start", "stop", "restart"}
+    UNIT_FILE = "/etc/systemd/system/protonmail-bridge.service"
+    UNIT = textwrap.dedent(
+        """\
+        [Unit]
+        Description=ProtonMail Bridge
+        After=network.target
+        ConditionPathExists=/var/run/qubes-service/protonmail-bridge
+
+        [Service]
+        Type=simple
+        ExecStart=/usr/bin/protonmail-bridge --noninteractive
+        Restart=on-failure
+
+        [Install]
+        WantedBy=multi-user.target
+        """
+    )
+
+    def __init__(self, net: Net):
+        self.net = net
+        self._release = None
+
+    def get_latest_release(self):
+        """Fetch the latest Bridge release metadata from GitHub, memoized per session."""
+        if self._release is None:
+            url = "https://api.github.com/repos/ProtonMail/proton-bridge/releases/latest"
+            req = urllib.request.Request(
+                url, headers={"Accept": "application/vnd.github+json"}
+            )
+            with self.net.get(req) as res:
+                self._release = json.load(res)
+        return self._release
+
+    def get_latest_version(self):
+        """Return the latest Bridge release version string."""
+        return self.get_latest_release()["tag_name"].lstrip("v")
+
+    def verify(self, pkg, sig, key_url):
+        """Verify a package against its GPG signature, importing the key if needed."""
+        result = subprocess.run(
+            ["gpg", "--list-keys", self.GPG_KEY_ID], capture_output=True
+        )
+        if result.returncode != 0:
+            print("importing ProtonMail GPG key...")
+            key_path = _cache.dir / "bridge_pubkey.gpg"
+            if not key_path.exists():
+                self.net.retrieve(key_url, key_path)
+            subprocess.run(["gpg", "--import", str(key_path)], check=True)
+
+        print("verifying signature...")
+        subprocess.run(["gpg", "--verify", str(sig), str(pkg)], check=True)
+
+    def install_package(self):
+        """Download and install the latest Bridge RPM, verifying its signature."""
+        release = self.get_latest_release()
+        assets = {a["name"]: a for a in release["assets"]}
+        rpm = next((a for name, a in assets.items() if name.endswith(".rpm")), None)
+
+        if not rpm:
+            raise SystemExit("no RPM asset found in latest release")
+
+        dest = _cache.dir / rpm["name"]
+
+        if dest.exists():
+            print(f"using cached {rpm['name']}")
+        else:
+            print(f"downloading {rpm['name']}...")
+            self.net.retrieve(rpm["browser_download_url"], dest)
+
+        sig = assets.get(rpm["name"] + ".sig")
+        if sig:
+            sig_dest = _cache.dir / sig["name"]
+            if not sig_dest.exists():
+                self.net.retrieve(sig["browser_download_url"], sig_dest)
+
+            key_asset = assets.get("bridge_pubkey.gpg")
+            if not key_asset:
+                raise SystemExit("no GPG key asset found in latest release")
+
+            self.verify(dest, sig_dest, key_asset["browser_download_url"])
+
+        subprocess.run(
+            ["sudo", "dnf", "install", "-y", str(dest), "libsecret", "pass"], check=True
+        )
+        _cache.write("bridge_version", release["tag_name"].lstrip("v"))
+
+    def install_unit(self):
+        """Install the systemd unit file and enable the Bridge service."""
+        print(f"installing unit file: {self.UNIT_FILE}")
+        subprocess.run(
+            ["sudo", "tee", self.UNIT_FILE], input=self.UNIT, text=True, check=True
+        )
+        subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+        self.systemctl("enable")
+        print(f"unit installed: {self.UNIT_FILE}")
+
+    def install(self):
+        """Install the Bridge package and its systemd unit."""
+        self.install_package()
+        self.install_unit()
+
+    def update(self):
+        """Update Bridge to the latest version if a newer one is available."""
+        version = self.get_latest_version()
+
+        if _cache.read("bridge_version") == version:
+            print(f"already at the latest version: v{version}")
+            return
+
+        self.install_package()
+        print(f"updated to v{version}")
+
+    def latest_version(self):
+        """Print the latest available Bridge version."""
+        print(self.get_latest_version())
+
+    def systemctl(self, cmd):
+        """Run a systemctl command against the Bridge service."""
+        assert cmd in self.SERVICE_COMMANDS, f"invalid service command: {cmd}"
+        subprocess.run(["sudo", "systemctl", cmd, "protonmail-bridge"])
+
+    def service(self, cmd):
+        """Dispatch a service lifecycle command to systemctl."""
+        self.systemctl(cmd)
+
+    def is_active(self):
+        """Return True if the Bridge service is currently running."""
+        result = subprocess.run(
+            ["systemctl", "is-active", "protonmail-bridge"], capture_output=True
+        )
+        return result.returncode == 0
+
+    def cli(self):
+        """Stop the service if running, then launch the Bridge CLI."""
+        if self.is_active():
+            self.systemctl("stop")
+        subprocess.run(["protonmail-bridge", "--cli"])
+
+
+def cache(args):
+    """Handle cache subcommands."""
+    match getattr(args, "cache_command", None):
+        case "clear":
+            _cache.clear()
+            print("cache cleared")
+        case _:
+            cache_parser.print_help()
+
+
+def client_start(args):
+    """Launch the Emacs email client if it is not already running."""
+    result = subprocess.run(["pgrep", "--exact", "emacs-lucid"], capture_output=True)
+    if result.returncode != 0:
+        subprocess.Popen(
+            ["emacs-lucid"],
+            env={**os.environ, "EMACS_MODE": "email"},
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    else:
+        print("Emacs already running, skipping...")
+
+
+def client(args):
+    """Handle client subcommands."""
+    match getattr(args, "client_command", None):
+        case "start":
+            client_start(args)
+        case _:
+            client_parser.print_help()
+
+
+def bridge(args):
+    """Handle bridge subcommands."""
+    net = Net(proxy=None if args.no_proxy else args.proxy)
+    proton = Proton(net)
+    cmd = getattr(args, "bridge_command", None)
+    match cmd:
+        case "latest-version":
+            proton.latest_version()
+        case "update":
+            proton.update()
+        case "install":
+            proton.install()
+        case "cli":
+            proton.cli()
+        case _ if cmd in Proton.SERVICE_COMMANDS:
+            proton.service(cmd)
+        case _:
+            bridge_parser.print_help()
+
+
+parser = argparse.ArgumentParser(prog="proton")
+
+
+def add_proxy_args(parser):
+    """Add --proxy/--no-proxy to a parser."""
+    g = parser.add_mutually_exclusive_group()
+    g.add_argument("--proxy", default=DEFAULT_PROXY, metavar="URL")
+    g.add_argument("--no-proxy", "-x", action="store_true")
+
+
+subparsers = parser.add_subparsers(dest="command")
+
+client_parser = subparsers.add_parser("client")
+client_subparsers = client_parser.add_subparsers(dest="client_command")
+client_subparsers.add_parser("start")
+
+cache_parser = subparsers.add_parser("cache")
+cache_subparsers = cache_parser.add_subparsers(dest="cache_command")
+cache_subparsers.add_parser("clear")
+
+bridge_parser = subparsers.add_parser("bridge")
+add_proxy_args(bridge_parser)
+bridge_subparsers = bridge_parser.add_subparsers(dest="bridge_command")
+bridge_subparsers.add_parser("latest-version")
+update_parser = bridge_subparsers.add_parser("update")
+add_proxy_args(update_parser)
+install_parser = bridge_subparsers.add_parser("install")
+bridge_subparsers.add_parser("cli")
+add_proxy_args(install_parser)
+
+for cmd in Proton.SERVICE_COMMANDS:
+    bridge_subparsers.add_parser(cmd)
+
+args = parser.parse_args()
+
+match getattr(args, "command", None):
+    case "client":
+        client(args)
+    case "cache":
+        cache(args)
+    case "bridge":
+        bridge(args)
+    case _:
+        parser.print_help()
