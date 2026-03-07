@@ -1,0 +1,10 @@
+[lepton.apps.terminal.default]
+cmd = "alacritty"
+exec = "alacritty --command %s"
+
+[lepton.apps.terminal.graphics]
+cmd = "kitty"
+exec = "kitty --command %s"
+
+[lepton.qubes.email.apps]
+terminal = "default"
