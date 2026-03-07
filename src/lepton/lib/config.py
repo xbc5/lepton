@@ -56,12 +56,12 @@ class App:
 
 
 class Config:
-    """Loads and validates /etc/config.toml, providing app resolution for domains."""
+    """Loads and validates a config TOML, providing app resolution for qubes."""
 
-    CONFIG_PATH = Path("/etc/config.toml")
+    DEFAULT_PATH = Path("/etc/config.toml")
 
-    def __init__(self):
-        with open(self.CONFIG_PATH, "rb") as f:
+    def __init__(self, path: Path = DEFAULT_PATH):
+        with open(path, "rb") as f:
             raw = tomllib.load(f)
         self._config = RootModel(**raw)
 
