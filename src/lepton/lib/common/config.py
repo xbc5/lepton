@@ -1,6 +1,6 @@
 import tomllib
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from pydantic import BaseModel, validator
 
@@ -22,11 +22,32 @@ class QubeModel(BaseModel):
     apps: Dict[str, str]
 
 
+class TemplateVmModel(BaseModel):
+    """Proxy settings pushed to template VMs."""
+
+    http_proxy: str
+    https_proxy: str
+
+
+class CommonModel(BaseModel):
+    """Non-sensitive configuration shared with every domain."""
+
+    templatevm: Optional[TemplateVmModel] = None
+
+
+class MgmtModel(BaseModel):
+    """Potentially sensitive configuration for management domains only."""
+
+    pass
+
+
 class LeptonModel(BaseModel):
     """A simple, future-proof namespace."""
 
     apps: Dict[str, Dict[str, AppModel]]
     qubes: Dict[str, QubeModel]
+    common: Optional[CommonModel] = None
+    mgmt: Optional[MgmtModel] = None
 
     @validator("qubes", pre=True)
     def inject_names(cls, qubes):
@@ -64,6 +85,11 @@ class Config:
         with open(path, "rb") as f:
             raw = tomllib.load(f)
         self._config = RootModel(**raw)
+
+    @property
+    def common(self) -> Optional[CommonModel]:
+        """Return the common namespace."""
+        return self._config.lepton.common
 
     def get_app_for(self, domain: str, app_type: str) -> App:
         """Return the App configured for the given domain and app type."""

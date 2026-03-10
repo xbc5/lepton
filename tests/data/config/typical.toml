@@ -8,3 +8,7 @@ exec = "kitty --command %s"
 
 [lepton.qubes.email.apps]
 terminal = "default"
+
+[lepton.common.templatevm]
+http_proxy = "http://127.0.0.1:8082"
+https_proxy = "http://127.0.0.1:8082"
