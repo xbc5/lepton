@@ -28,11 +28,27 @@ class ConfBuilder:
 
         return self
 
-    def add_qube(self, name: str, apps: dict) -> "ConfBuilder":
+    def add_script(self, name: str, profile: str) -> "ConfBuilder":
+        """Add a script configuration profile."""
+        scripts = self._doc["lepton"].setdefault("scripts", tomlkit.table())
+        if name not in scripts:
+            scripts[name] = tomlkit.table()
+        scripts[name][profile] = {}
+        return self
+
+    def add_qube(
+        self,
+        name: str,
+        apps: Optional[dict] = None,
+        scripts: Optional[dict] = None,
+    ) -> "ConfBuilder":
         """Assign reusable configuration values to a qube."""
         qubes = self._doc["lepton"].setdefault("qube", tomlkit.table())
         qubes[name] = tomlkit.table()
-        qubes[name]["apps"] = apps
+        if apps is not None:
+            qubes[name]["apps"] = apps
+        if scripts is not None:
+            qubes[name]["scripts"] = scripts
         return self
 
     def add_templatevm(self, http_proxy: str, https_proxy: str) -> "ConfBuilder":

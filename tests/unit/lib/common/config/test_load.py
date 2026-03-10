@@ -22,6 +22,11 @@ class TestOptionality:
         cfg = Config(ConfBuilder().add_app("terminal", "default", "alacritty").build(tmp_path))
         assert cfg._config.lepton.qube is None
 
+    def test_without_scripts(self, tmp_path):
+        """Test that it loads without any scripts."""
+        cfg = Config(ConfBuilder().build(tmp_path))
+        assert cfg._config.lepton.scripts is None
+
     def test_without_file(self, tmp_path):
         """Test that it loads without a backing file."""
         assert Config(tmp_path / "nonexistent.toml") is not None

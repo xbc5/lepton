@@ -45,12 +45,22 @@ Application profiles reused by other parts of the configuration.
 
 | Key                                    | Description                                                 |
 | -------------------------------------- | ----------------------------------------------------------- |
-| `lepton`                               | Root namespace.                                             |
 | `lepton.apps`                          | App configurations.                                         |
 | `lepton.apps.<type>`                   | An arbitrary category of app.                               |
 | `lepton.apps.<type>.<profile>`         | An arbitrary name that describes its use case.              |
 | `lepton.apps.<type>.<profile>.cmd`     | The command to run.                                         |
 | `lepton.apps.<type>.<profile>.exec`    | Execution template; any `%s` gets interpolated with args.   |
+
+
+#### `lepton.scripts.conf`
+Configuration profiles for lepton scripts.
+
+| Key                                    | Description                                                 |
+| -------------------------------------- | ----------------------------------------------------------- |
+| `lepton.script`                          | Configuration profiles for scripts.                                         |
+| `lepton.scripts.<name>`                   | Target a specific script by name. |
+| `lepton.scripts.<name>.<profile>`                   | An aritrary profile name for the said script. |
+
 
 #### `lepton.qube`
 Configuration values applied to each qube individually.
@@ -58,7 +68,10 @@ Configuration values applied to each qube individually.
 | Key                        | Description                                              |
 | -------------------------- | -------------------------------------------------------- |
 | `lepton.qube`             | Assign configuration values to each qube.                |
+| `lepton.qube.all.apps` | Maps `lepton.apps.<type>.<profile>` to all qubes. |
 | `lepton.qube.<name>.apps` | Maps `lepton.apps.<type>.<profile>` to a specific qube. |
+| `lepton.qube.all.scripts` | Maps `lepton.script.<name>.<profile>` to all qubes. |
+| `lepton.qube.<name>.scripts` | Maps `lepton.scripts.<name>.<profile>` to a specific qube. |
 
 #### `lepton.common.templatevms`
 Configuration values applied to all TemplateVMs.

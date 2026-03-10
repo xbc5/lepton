@@ -15,11 +15,18 @@ class AppModel(BaseModel):
     exec: Optional[str] = None
 
 
+class ScriptModel(BaseModel):
+    """Represents a script configuration profile."""
+
+    pass
+
+
 class QubeModel(BaseModel):
     """Represents a single qube."""
 
     name: str
-    apps: Dict[str, str]
+    apps: Optional[Dict[str, str]] = None
+    scripts: Optional[Dict[str, str]] = None
 
 
 class TemplateVmModel(BaseModel):
@@ -45,6 +52,7 @@ class LeptonModel(BaseModel):
     """A simple, future-proof namespace."""
 
     apps: Optional[Dict[str, Dict[str, AppModel]]] = None
+    scripts: Optional[Dict[str, Dict[str, ScriptModel]]] = None
     qube: Optional[Dict[str, QubeModel]] = None
     common: CommonModel = CommonModel()
     mgmt: Optional[MgmtModel] = None
