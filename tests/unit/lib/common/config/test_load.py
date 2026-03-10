@@ -1,7 +1,3 @@
-from tests.helpers import ConfName
-
-
-def test_loads_config(config):
+def test_loads_config(typical_conf):
     """Test that it loads a config file without error."""
-    cfg = config(ConfName.TYPICAL)
-    assert cfg is not None
+    assert typical_conf is not None

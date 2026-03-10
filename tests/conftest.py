@@ -1,14 +1,10 @@
 import pytest
 
 from lepton.lib.common.config import Config
-from tests.helpers import ConfName, Paths
+from tests.conf_builder import ConfBuilder
 
 
 @pytest.fixture
-def config():
-    """Return a factory that loads a Config from tests/data/config/."""
-
-    def _config(name: ConfName) -> Config:
-        return Config(Paths().data(name))
-
-    return _config
+def typical_conf(tmp_path) -> Config:
+    """Return a Config loaded from the typical builder."""
+    return Config(ConfBuilder.typical().build(tmp_path))

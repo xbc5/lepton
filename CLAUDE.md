@@ -15,6 +15,7 @@
 You must invariably follow these rules:
 - Use the `CONFIG` file as the source of truth.
 - The `CONF_BUILDER` methods must reflect the structure of `CONFIG`.
+- The `CONF_BUILDER` "typical" factory must ALWAYS reflect the values in `CONFIG`.
 - The `CONF_MODEL` must represent the structure of `CONFIG`.
 
 However, note that we will edit each of these one at a time, not everything all at once.

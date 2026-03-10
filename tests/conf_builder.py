@@ -1,4 +1,3 @@
-import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -42,9 +41,19 @@ class ConfBuilder:
         common["templatevms"] = {"http_proxy": http_proxy, "https_proxy": https_proxy}
         return self
 
-    def build(self) -> Path:
+    @classmethod
+    def typical(cls) -> "ConfBuilder":
+        """Return a builder preconfigured with the typical CONFIG values."""
+        return (
+            cls()
+            .add_app("terminal", "default", "alacritty", "alacritty --command %s")
+            .add_app("terminal", "graphics", "kitty", "kitty --command %s")
+            .add_qube("email", {"terminal": "default"})
+            .add_templatevm("http://127.0.0.1:8082", "http://127.0.0.1:8082")
+        )
+
+    def build(self, path: Path) -> Path:
         """Write the config to a temp file and return its path."""
-        tmp = tempfile.NamedTemporaryFile(suffix=".toml", delete=False, mode="w")
-        tmp.write(self._doc.as_string())
-        tmp.flush()
-        return Path(tmp.name)
+        path = path / "config.toml"
+        path.write_text(self._doc.as_string())
+        return path
