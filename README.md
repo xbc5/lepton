@@ -6,86 +6,31 @@ My Qubes script framework. The scripts rely on configured values. The code bridg
 
 This is the source of truth for how Lepton behaves.
 
-There are two primary namespaces (sections):
-```toml
-[lepton.common...]
-[lepton.mgmt...]
-```
-
-- "common": Non-sensitive information. Every domain has access to this.
-- "mgmt": Potentially sensitive information. Only management domains have access to this.
-
-Lepton will push the "common" section to configured templates on request.
-
 
 ```toml
-[lepton.apps.terminal.default]
+[app.terminal.default]
 cmd = "alacritty" 
 exec = "alacritty --command %s" 
 
-[lepton.apps.terminal.graphics]
+[app.terminal.graphics]
 cmd = "kitty"
 exec = "kitty --command %s"
 
-[lepton.qubes.email.apps]
-terminal = "default"
-
-[lepton.common.templatevm]
-# Used to communicate with the outside world via qrexec.
-http_proxy = "http://127.0.0.1:8082" # Sends traffic to a remote HTTP endpoint.
-https_proxy = "http://127.0.0.1:8082" # Sends traffic to a remote HTTPS endpoint.
 ```
 
 ### Key descriptions
 
 A description of each key.
 
-#### `lepton.apps`
-Application profiles reused by other parts of the configuration.
+#### `app`
+Mappings of applications to their function.
 
 | Key                                    | Description                                                 |
 | -------------------------------------- | ----------------------------------------------------------- |
-| `lepton.apps`                          | App configurations.                                         |
-| `lepton.apps.<type>`                   | An arbitrary category of app.                               |
-| `lepton.apps.<type>.<profile>`         | An arbitrary name that describes its use case.              |
-| `lepton.apps.<type>.<profile>.cmd`     | The command to run.                                         |
-| `lepton.apps.<type>.<profile>.exec`    | Execution template; any `%s` gets interpolated with args.   |
+| `app`                          | App configurations.                                         |
+| `app.<type>`                   | An arbitrary category of app.                               |
+| `app.<type>.<profile>`         | An arbitrary name that describes its use case.              |
+| `app.<type>.<profile>.cmd`     | The command to run.                                         |
+| `app.<type>.<profile>.exec`    | Execution template; any `%s` gets interpolated with args.   |
 
 
-#### `lepton.scripts.conf`
-Configuration profiles for lepton scripts.
-
-| Key                                    | Description                                                 |
-| -------------------------------------- | ----------------------------------------------------------- |
-| `lepton.script`                          | Configuration profiles for scripts.                                         |
-| `lepton.scripts.<name>`                   | Target a specific script by name. |
-| `lepton.scripts.<name>.<profile>`                   | An aritrary profile name for the said script. |
-
-
-#### `lepton.qube`
-Configuration values applied to each qube individually.
-
-| Key                        | Description                                              |
-| -------------------------- | -------------------------------------------------------- |
-| `lepton.qube`             | Assign configuration values to each qube.                |
-| `lepton.qube.all.apps` | Maps `lepton.apps.<type>.<profile>` to all qubes. |
-| `lepton.qube.<name>.apps` | Maps `lepton.apps.<type>.<profile>` to a specific qube. |
-| `lepton.qube.all.scripts` | Maps `lepton.script.<name>.<profile>` to all qubes. |
-| `lepton.qube.<name>.scripts` | Maps `lepton.scripts.<name>.<profile>` to a specific qube. |
-
-#### `lepton.common.templatevms`
-Configuration values applied to all TemplateVMs.
-
-| Key                                     | Description                                          |
-| --------------------------------------- | ---------------------------------------------------- |
-| `lepton.common`                         | Non-sensitive configuration shared with all domains. |
-| `lepton.common.templatevms`             | Configuration values applied to all TemplateVMs.     |
-| `lepton.common.templatevms.http_proxy`  | HTTP proxy URL.                                      |
-| `lepton.common.templatevms.https_proxy` | HTTPS proxy URL.                                     |
-
-#### `lepton.mgmt`
-Sensitive configuration for management domains.
-
-| Key            | Description                                     |
-| -------------- | ----------------------------------------------- |
-| `lepton.mgmt` | Sensitive configuration for management domains. |
