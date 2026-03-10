@@ -9,6 +9,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from lepton.lib.common.config import Config
+
 
 class Cache:
     """XDG-compliant cache for storing proton-related files and state."""
@@ -37,13 +39,11 @@ class Cache:
 
 _cache = Cache()
 
-DEFAULT_PROXY = "http://127.0.0.1:8082"
-
 
 class Net:
     """HTTP client with optional proxy support."""
 
-    def __init__(self, proxy: str | None = DEFAULT_PROXY):
+    def __init__(self, proxy: str | None = Config().common.templatevms.http_proxy):
         self.proxy = proxy
         handlers = [
             urllib.request.ProxyHandler(
@@ -223,7 +223,12 @@ class Proton:
 def _new_proton(args, net=True):
     """Create a Proton instance from parsed args."""
     if net:
-        return Proton(Net(proxy=None if args.no_proxy else args.proxy))
+        proxy = (
+            None
+            if args.no_proxy
+            else (args.proxy or Config().common.templatevms.http_proxy)
+        )
+        return Proton(Net(proxy=proxy))
     return Proton(Net(proxy=None))
 
 
@@ -265,7 +270,7 @@ def service(args):
 def add_proxy_args(parser):
     """Add --proxy/--no-proxy to a parser."""
     g = parser.add_mutually_exclusive_group()
-    g.add_argument("--proxy", default=DEFAULT_PROXY, metavar="URL")
+    g.add_argument("--proxy", default=None, metavar="URL")
     g.add_argument("--no-proxy", "-x", action="store_true")
 
 
