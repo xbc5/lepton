@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from lepton.lib.config import Config
+from lepton.lib.common.config import Config
 
 DATA_DIR = Path(__file__).parent / "data" / "config"
 
