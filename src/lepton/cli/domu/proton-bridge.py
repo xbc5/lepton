@@ -8,7 +8,7 @@ import textwrap
 import urllib.error
 import urllib.request
 from pathlib import Path
-from lepton.lib.common import config
+from lepton.lib.common import constants
 
 import qubesdb
 
@@ -35,7 +35,7 @@ class ProtonDB:
 
     @property
     def http_proxy(self) -> str:
-        return self._read(self._HTTP_PROXY_KEY, config.HTTP_PROXY)
+        return self._read(self._HTTP_PROXY_KEY, constants.QREXEC_HTTP_PROXY)
 
     @property
     def gpg_key_id(self) -> str:
