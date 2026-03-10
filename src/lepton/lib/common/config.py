@@ -25,14 +25,14 @@ class QubeModel(BaseModel):
 class TemplateVmModel(BaseModel):
     """Proxy settings pushed to template VMs."""
 
-    http_proxy: str
-    https_proxy: str
+    http_proxy: str = "http://127.0.0.1:8082"
+    https_proxy: str = "http://127.0.0.1:8082"
 
 
 class CommonModel(BaseModel):
     """Non-sensitive configuration shared with every domain."""
 
-    templatevms: Optional[TemplateVmModel] = None
+    templatevms: TemplateVmModel = TemplateVmModel()
 
 
 class MgmtModel(BaseModel):
@@ -46,7 +46,7 @@ class LeptonModel(BaseModel):
 
     apps: Optional[Dict[str, Dict[str, AppModel]]] = None
     qube: Optional[Dict[str, QubeModel]] = None
-    common: Optional[CommonModel] = None
+    common: CommonModel = CommonModel()
     mgmt: Optional[MgmtModel] = None
 
     @validator("qube", pre=True)
@@ -89,7 +89,7 @@ class Config:
         self._config = RootModel(**raw)
 
     @property
-    def common(self) -> Optional[CommonModel]:
+    def common(self) -> CommonModel:
         """Return the common namespace."""
         return self._config.lepton.common
 

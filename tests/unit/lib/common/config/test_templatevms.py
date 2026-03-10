@@ -12,13 +12,13 @@ def test_https_proxy(typical_conf):
     assert typical_conf.common.templatevms.https_proxy == "http://127.0.0.1:8082"
 
 
-class TestOptionality:
-    def test_without_common(self, tmp_path):
-        """Test that it loads without the common namespace."""
+class TestDefaults:
+    def test_default_http_proxy(self, tmp_path):
+        """Test that it defaults http_proxy when common is absent."""
         cfg = Config(ConfBuilder().build(tmp_path))
-        assert cfg.common is None
+        assert cfg.common.templatevms.http_proxy == "http://127.0.0.1:8082"
 
-    def test_without_templatevms(self, tmp_path):
-        """Test that it loads common without templatevms."""
-        cfg = Config(ConfBuilder().add_app("terminal", "default", "alacritty").build(tmp_path))
-        assert cfg.common is None
+    def test_default_https_proxy(self, tmp_path):
+        """Test that it defaults https_proxy when common is absent."""
+        cfg = Config(ConfBuilder().build(tmp_path))
+        assert cfg.common.templatevms.https_proxy == "http://127.0.0.1:8082"

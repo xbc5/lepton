@@ -23,8 +23,8 @@ class TestOptionality:
         assert cfg._config.lepton.qube is None
 
     def test_without_common(self, tmp_path):
-        """Test that it loads without the common namespace."""
-        assert Config(ConfBuilder().build(tmp_path)).common is None
+        """Test that it defaults common when absent."""
+        assert Config(ConfBuilder().build(tmp_path)).common is not None
 
     def test_without_mgmt(self, tmp_path):
         """Test that it loads without the mgmt namespace."""
