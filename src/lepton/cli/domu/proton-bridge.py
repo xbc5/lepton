@@ -8,33 +8,39 @@ import textwrap
 import urllib.error
 import urllib.request
 from pathlib import Path
+from lepton.lib.common import config
 
-from lepton.lib.common.config import Config as GlobalConfig
-from lepton.lib.common.host import QubeHost
+import qubesdb
 
 
-class Config:
+class ProtonDB:
+    """Read proton-bridge configuration from QubesDB."""
+
+    _FILE_NAME = Path(__file__).stem
+
+    # QubesDB paths for this script's configuration.
+    _PREFIX = f"/{_FILE_NAME}"
+    _HTTP_PROXY_KEY = f"{_PREFIX}/http-proxy"
+    _GPG_KEY_ID_KEY = f"{_PREFIX}/gpg-key-id"
+
     def __init__(self):
-        self._global = GlobalConfig()
-        self._qube_name = QubeHost().name
+        self._qdb = qubesdb.QubesDB()
+
+    def _read(self, key, default: str) -> str:
+        """Read a QubesDB key, returning default if absent."""
+        value = self._qdb.read(key)
+        if value is None:
+            return default
+        return value.decode().strip()
 
     @property
-    def http_proxy(self):
-        return self._global.common.templatevms.http_proxy
+    def http_proxy(self) -> str:
+        return self._read(self._HTTP_PROXY_KEY, config.HTTP_PROXY)
 
     @property
-    def gpg_key_id(self):
-        script_name = Path(__file__).stem
-        try:
-            qube_conf = self._global._config.lepton.get_qube(self._qube_name)
-            if qube_conf is None:
-                raise KeyError
-            if qube_conf.scripts is None:
-                raise KeyError
-            profile = qube_conf.scripts[script_name]
-            return self._global._config.lepton.scripts[script_name][profile]["gpg_key_id"]  # type: ignore
-        except (KeyError, TypeError):
-            raise SystemExit(f"{script_name}: Missing GPG key ID spec from config")
+    def gpg_key_id(self) -> str:
+        # ProtonMail distributes their key on GitHub releases.
+        return self._read(self._GPG_KEY_ID_KEY, "E2C75D68E6234B07")
 
 
 class Cache:
@@ -68,7 +74,7 @@ _cache = Cache()
 class Net:
     """HTTP client with optional proxy support."""
 
-    def __init__(self, proxy: str | None = Config().http_proxy):
+    def __init__(self, proxy: str | None = ProtonDB().http_proxy):
         self.proxy = proxy
         handlers = [
             urllib.request.ProxyHandler(
@@ -99,7 +105,6 @@ class Net:
 class Proton:
     """Manages the ProtonMail Bridge installation, updates, and service lifecycle."""
 
-    GPG_KEY_ID = "E2C75D68E6234B07"
     SERVICE_COMMANDS = {"enable", "disable", "status", "start", "stop", "restart"}
     UNIT_FILE = "/etc/systemd/system/protonmail-bridge.service"
     UNIT = textwrap.dedent(
@@ -122,7 +127,7 @@ class Proton:
     def __init__(self, net: Net):
         self.net = net
         self._release = None
-        self._gpg_key_id = Config().gpg_key_id
+        self._gpg_key_id = ProtonDB().gpg_key_id
 
     def get_latest_release(self):
         """Fetch the latest Bridge release metadata from GitHub, memoized per session."""
@@ -143,6 +148,8 @@ class Proton:
 
     def verify(self, pkg, sig, key_url):
         """Verify a package against its GPG signature, importing the key if needed."""
+        if not self._gpg_key_id:
+            raise SystemExit("proton-bridge: no GPG key ID set in QubesDB")
         result = subprocess.run(
             ["gpg", "--list-keys", self._gpg_key_id], capture_output=True
         )
@@ -249,7 +256,7 @@ class Proton:
 def _new_proton(args, net=True):
     """Create a Proton instance from parsed args."""
     if net:
-        proxy = None if args.no_proxy else (args.proxy or Config().http_proxy)
+        proxy = None if args.no_proxy else (args.proxy or ProtonDB().http_proxy)
         return Proton(Net(proxy=proxy))
     return Proton(Net(proxy=None))
 

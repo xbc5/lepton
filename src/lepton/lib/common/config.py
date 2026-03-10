@@ -4,6 +4,7 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, validator
 
+HTTP_PROXY = "http://127.0.0.1:8082"
 
 # Pydantic models for config validation.
 
