@@ -6,9 +6,9 @@ exec = "alacritty --command %s"
 cmd = "kitty"
 exec = "kitty --command %s"
 
-[lepton.qubes.email.apps]
+[lepton.qube.email.apps]
 terminal = "default"
 
-[lepton.common.templatevm]
+[lepton.common.templatevms]
 http_proxy = "http://127.0.0.1:8082"
 https_proxy = "http://127.0.0.1:8082"

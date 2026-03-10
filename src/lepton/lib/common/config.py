@@ -12,7 +12,7 @@ class AppModel(BaseModel):
     """Represents a typical app."""
 
     cmd: str
-    exec: str
+    exec: Optional[str] = None
 
 
 class QubeModel(BaseModel):
@@ -32,7 +32,7 @@ class TemplateVmModel(BaseModel):
 class CommonModel(BaseModel):
     """Non-sensitive configuration shared with every domain."""
 
-    templatevm: Optional[TemplateVmModel] = None
+    templatevms: Optional[TemplateVmModel] = None
 
 
 class MgmtModel(BaseModel):
@@ -44,15 +44,17 @@ class MgmtModel(BaseModel):
 class LeptonModel(BaseModel):
     """A simple, future-proof namespace."""
 
-    apps: Dict[str, Dict[str, AppModel]]
-    qubes: Dict[str, QubeModel]
+    apps: Optional[Dict[str, Dict[str, AppModel]]] = None
+    qube: Optional[Dict[str, QubeModel]] = None
     common: Optional[CommonModel] = None
     mgmt: Optional[MgmtModel] = None
 
-    @validator("qubes", pre=True)
-    def inject_names(cls, qubes):
-        # Inject the TOML key as the qube name, because the model needs it.
-        return {k: {**v, "name": k} for k, v in qubes.items()}
+    @validator("qube", pre=True)
+    def inject_names(cls, qube):
+        # Inject the qube name (e.g., "foo" from lepton.qube.foo).
+        if qube is None:
+            return None
+        return {k: {**v, "name": k} for k, v in qube.items()}
 
 
 class RootModel(BaseModel):
@@ -93,6 +95,6 @@ class Config:
 
     def get_app_for(self, domain: str, app_type: str) -> App:
         """Return the App configured for the given domain and app type."""
-        profile = self._config.lepton.qubes[domain].apps[app_type]
+        profile = self._config.lepton.qube[domain].apps[app_type]
         app_config = self._config.lepton.apps[app_type][profile]
         return App(app_config)
