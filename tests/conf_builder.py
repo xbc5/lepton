@@ -9,13 +9,12 @@ class ConfBuilder:
 
     def __init__(self):
         self._doc = tomlkit.document()
-        self._doc["lepton"] = tomlkit.table()
 
     def add_app(
         self, app_type: str, profile: str, cmd: str, exec_: Optional[str] = None
     ) -> "ConfBuilder":
         """Add an application that the user can execute."""
-        apps = self._doc["lepton"].setdefault("apps", tomlkit.table())
+        apps = self._doc.setdefault("app", tomlkit.table())
 
         if app_type not in apps:
             apps[app_type] = tomlkit.table()
@@ -28,35 +27,6 @@ class ConfBuilder:
 
         return self
 
-    def add_script(self, name: str, profile: str) -> "ConfBuilder":
-        """Add a script configuration profile."""
-        scripts = self._doc["lepton"].setdefault("scripts", tomlkit.table())
-        if name not in scripts:
-            scripts[name] = tomlkit.table()
-        scripts[name][profile] = {}
-        return self
-
-    def add_qube(
-        self,
-        name: str,
-        apps: Optional[dict] = None,
-        scripts: Optional[dict] = None,
-    ) -> "ConfBuilder":
-        """Assign reusable configuration values to a qube."""
-        qubes = self._doc["lepton"].setdefault("qube", tomlkit.table())
-        qubes[name] = tomlkit.table()
-        if apps is not None:
-            qubes[name]["apps"] = apps
-        if scripts is not None:
-            qubes[name]["scripts"] = scripts
-        return self
-
-    def add_templatevm(self, http_proxy: str, https_proxy: str) -> "ConfBuilder":
-        """Assign TemplateVM configuration values."""
-        common = self._doc["lepton"].setdefault("common", tomlkit.table())
-        common["templatevms"] = {"http_proxy": http_proxy, "https_proxy": https_proxy}
-        return self
-
     @classmethod
     def typical(cls) -> "ConfBuilder":
         """Return a builder preconfigured with the typical CONFIG values."""
@@ -64,8 +34,6 @@ class ConfBuilder:
             cls()
             .add_app("terminal", "default", "alacritty", "alacritty --command %s")
             .add_app("terminal", "graphics", "kitty", "kitty --command %s")
-            .add_qube("email", {"terminal": "default"})
-            .add_templatevm("http://127.0.0.1:8082", "http://127.0.0.1:8082")
         )
 
     def build(self, path: Path) -> Path:

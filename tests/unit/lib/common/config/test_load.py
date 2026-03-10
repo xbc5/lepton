@@ -8,33 +8,15 @@ def test_loads_config(typical_conf):
 
 
 class TestOptionality:
-    def test_empty_lepton(self, tmp_path):
-        """Test that it loads with only the root namespace."""
+    def test_empty_config(self, tmp_path):
+        """Test that it loads with an empty config."""
         assert Config(ConfBuilder().build(tmp_path)) is not None
 
     def test_without_apps(self, tmp_path):
         """Test that it loads without any apps."""
-        cfg = Config(ConfBuilder().add_qube("email", {"terminal": "default"}).build(tmp_path))
-        assert cfg._config.lepton.apps is None
-
-    def test_without_qube(self, tmp_path):
-        """Test that it loads without any qubes."""
-        cfg = Config(ConfBuilder().add_app("terminal", "default", "alacritty").build(tmp_path))
-        assert cfg._config.lepton.qube is None
-
-    def test_without_scripts(self, tmp_path):
-        """Test that it loads without any scripts."""
         cfg = Config(ConfBuilder().build(tmp_path))
-        assert cfg._config.lepton.scripts is None
+        assert cfg._config.app is None
 
     def test_without_file(self, tmp_path):
         """Test that it loads without a backing file."""
         assert Config(tmp_path / "nonexistent.toml") is not None
-
-    def test_without_common(self, tmp_path):
-        """Test that it defaults common when absent."""
-        assert Config(ConfBuilder().build(tmp_path)).common is not None
-
-    def test_without_mgmt(self, tmp_path):
-        """Test that it loads without the mgmt namespace."""
-        assert Config(ConfBuilder().build(tmp_path))._config.lepton.mgmt is None
