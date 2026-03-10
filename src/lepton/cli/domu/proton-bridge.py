@@ -9,7 +9,32 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from lepton.lib.common.config import Config
+from lepton.lib.common.config import Config as GlobalConfig
+from lepton.lib.common.host import QubeHost
+
+
+class Config:
+    def __init__(self):
+        self._global = GlobalConfig()
+        self._qube_name = QubeHost().name
+
+    @property
+    def http_proxy(self):
+        return self._global.common.templatevms.http_proxy
+
+    @property
+    def gpg_key_id(self):
+        script_name = Path(__file__).stem
+        try:
+            qube_conf = self._global._config.lepton.get_qube(self._qube_name)
+            if qube_conf is None:
+                raise KeyError
+            if qube_conf.scripts is None:
+                raise KeyError
+            profile = qube_conf.scripts[script_name]
+            return self._global._config.lepton.scripts[script_name][profile]["gpg_key_id"]  # type: ignore
+        except (KeyError, TypeError):
+            raise SystemExit(f"{script_name}: Missing GPG key ID spec from config")
 
 
 class Cache:
@@ -43,7 +68,7 @@ _cache = Cache()
 class Net:
     """HTTP client with optional proxy support."""
 
-    def __init__(self, proxy: str | None = Config().common.templatevms.http_proxy):
+    def __init__(self, proxy: str | None = Config().http_proxy):
         self.proxy = proxy
         handlers = [
             urllib.request.ProxyHandler(
@@ -97,6 +122,7 @@ class Proton:
     def __init__(self, net: Net):
         self.net = net
         self._release = None
+        self._gpg_key_id = Config().gpg_key_id
 
     def get_latest_release(self):
         """Fetch the latest Bridge release metadata from GitHub, memoized per session."""
@@ -118,7 +144,7 @@ class Proton:
     def verify(self, pkg, sig, key_url):
         """Verify a package against its GPG signature, importing the key if needed."""
         result = subprocess.run(
-            ["gpg", "--list-keys", self.GPG_KEY_ID], capture_output=True
+            ["gpg", "--list-keys", self._gpg_key_id], capture_output=True
         )
         if result.returncode != 0:
             print("importing ProtonMail GPG key...")
@@ -223,11 +249,7 @@ class Proton:
 def _new_proton(args, net=True):
     """Create a Proton instance from parsed args."""
     if net:
-        proxy = (
-            None
-            if args.no_proxy
-            else (args.proxy or Config().common.templatevms.http_proxy)
-        )
+        proxy = None if args.no_proxy else (args.proxy or Config().http_proxy)
         return Proton(Net(proxy=proxy))
     return Proton(Net(proxy=None))
 

@@ -15,12 +15,6 @@ class AppModel(BaseModel):
     exec: Optional[str] = None
 
 
-class ScriptModel(BaseModel):
-    """Represents a script configuration profile."""
-
-    pass
-
-
 class QubeModel(BaseModel):
     """Represents a single qube."""
 
@@ -52,10 +46,16 @@ class LeptonModel(BaseModel):
     """A simple, future-proof namespace."""
 
     apps: Optional[Dict[str, Dict[str, AppModel]]] = None
-    scripts: Optional[Dict[str, Dict[str, ScriptModel]]] = None
+    scripts: Optional[Dict[str, Dict[str, dict]]] = None
     qube: Optional[Dict[str, QubeModel]] = None
     common: CommonModel = CommonModel()
     mgmt: Optional[MgmtModel] = None
+
+    def get_qube(self, name: str) -> Optional[QubeModel]:
+        """Return the qube by name, falling back to 'all', then None."""
+        if self.qube is None:
+            return None
+        return self.qube.get(name) or self.qube.get("all")
 
     @validator("qube", pre=True)
     def inject_names(cls, qube):
