@@ -22,6 +22,10 @@ class TestOptionality:
         cfg = Config(ConfBuilder().add_app("terminal", "default", "alacritty").build(tmp_path))
         assert cfg._config.lepton.qube is None
 
+    def test_without_file(self, tmp_path):
+        """Test that it loads without a backing file."""
+        assert Config(tmp_path / "nonexistent.toml") is not None
+
     def test_without_common(self, tmp_path):
         """Test that it defaults common when absent."""
         assert Config(ConfBuilder().build(tmp_path)).common is not None

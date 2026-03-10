@@ -84,8 +84,11 @@ class Config:
     DEFAULT_PATH = Path("/etc/config.toml")
 
     def __init__(self, path: Path = DEFAULT_PATH):
-        with open(path, "rb") as f:
-            raw = tomllib.load(f)
+        if path.exists():
+            with open(path, "rb") as f:
+                raw = tomllib.load(f)
+        else:
+            raw = {"lepton": {}}
         self._config = RootModel(**raw)
 
     @property
