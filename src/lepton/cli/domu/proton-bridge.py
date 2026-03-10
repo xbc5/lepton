@@ -11,11 +11,12 @@ from pathlib import Path
 
 
 class Cache:
-    """XDG-compliant cache for storing email-related files and state."""
+    """XDG-compliant cache for storing proton-related files and state."""
 
     def __init__(self):
         self.dir = (
-            Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "email"
+            Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+            / "proton-bridge"
         )
         self.dir.mkdir(parents=True, exist_ok=True)
 
@@ -100,7 +101,9 @@ class Proton:
     def get_latest_release(self):
         """Fetch the latest Bridge release metadata from GitHub, memoized per session."""
         if self._release is None:
-            url = "https://api.github.com/repos/ProtonMail/proton-bridge/releases/latest"
+            url = (
+                "https://api.github.com/repos/ProtonMail/proton-bridge/releases/latest"
+            )
             req = urllib.request.Request(
                 url, headers={"Accept": "application/vnd.github+json"}
             )
@@ -214,6 +217,16 @@ class Proton:
         subprocess.run(["protonmail-bridge", "--cli"])
 
 
+# Subcommand handlers.
+
+
+def _new_proton(args, net=True):
+    """Create a Proton instance from parsed args."""
+    if net:
+        return Proton(Net(proxy=None if args.no_proxy else args.proxy))
+    return Proton(Net(proxy=None))
+
+
 def cache(args):
     """Handle cache subcommands."""
     match getattr(args, "cache_command", None):
@@ -224,51 +237,29 @@ def cache(args):
             cache_parser.print_help()
 
 
-def client_start(args):
-    """Launch the Emacs email client if it is not already running."""
-    result = subprocess.run(["pgrep", "--exact", "emacs-lucid"], capture_output=True)
-    if result.returncode != 0:
-        subprocess.Popen(
-            ["emacs-lucid"],
-            env={**os.environ, "EMACS_MODE": "email"},
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    else:
-        print("Emacs already running, skipping...")
+def latest_version(args):
+    """Print the latest available Bridge version."""
+    _new_proton(args).latest_version()
 
 
-def client(args):
-    """Handle client subcommands."""
-    match getattr(args, "client_command", None):
-        case "start":
-            client_start(args)
-        case _:
-            client_parser.print_help()
+def update(args):
+    """Update Bridge to the latest version."""
+    _new_proton(args).update()
 
 
-def bridge(args):
-    """Handle bridge subcommands."""
-    net = Net(proxy=None if args.no_proxy else args.proxy)
-    proton = Proton(net)
-    cmd = getattr(args, "bridge_command", None)
-    match cmd:
-        case "latest-version":
-            proton.latest_version()
-        case "update":
-            proton.update()
-        case "install":
-            proton.install()
-        case "cli":
-            proton.cli()
-        case _ if cmd in Proton.SERVICE_COMMANDS:
-            proton.service(cmd)
-        case _:
-            bridge_parser.print_help()
+def install(args):
+    """Install Bridge and its systemd unit."""
+    _new_proton(args).install()
 
 
-parser = argparse.ArgumentParser(prog="proton")
+def cli(args):
+    """Launch the Bridge CLI."""
+    _new_proton(args, net=False).cli()
+
+
+def service(args):
+    """Run a systemctl command against the Bridge service."""
+    _new_proton(args).service(args.command)
 
 
 def add_proxy_args(parser):
@@ -278,37 +269,43 @@ def add_proxy_args(parser):
     g.add_argument("--no-proxy", "-x", action="store_true")
 
 
-subparsers = parser.add_subparsers(dest="command")
+# Argument parsing.
 
-client_parser = subparsers.add_parser("client")
-client_subparsers = client_parser.add_subparsers(dest="client_command")
-client_subparsers.add_parser("start")
+parser = argparse.ArgumentParser(prog="proton")
+subparsers = parser.add_subparsers(dest="command")
 
 cache_parser = subparsers.add_parser("cache")
 cache_subparsers = cache_parser.add_subparsers(dest="cache_command")
 cache_subparsers.add_parser("clear")
 
-bridge_parser = subparsers.add_parser("bridge")
-add_proxy_args(bridge_parser)
-bridge_subparsers = bridge_parser.add_subparsers(dest="bridge_command")
-bridge_subparsers.add_parser("latest-version")
-update_parser = bridge_subparsers.add_parser("update")
+latest_ver_parser = subparsers.add_parser("latest-version")
+add_proxy_args(latest_ver_parser)
+
+update_parser = subparsers.add_parser("update")
 add_proxy_args(update_parser)
-install_parser = bridge_subparsers.add_parser("install")
-bridge_subparsers.add_parser("cli")
+
+install_parser = subparsers.add_parser("install")
 add_proxy_args(install_parser)
 
+subparsers.add_parser("cli")
+
 for cmd in Proton.SERVICE_COMMANDS:
-    bridge_subparsers.add_parser(cmd)
+    subparsers.add_parser(cmd)
 
 args = parser.parse_args()
 
 match getattr(args, "command", None):
-    case "client":
-        client(args)
     case "cache":
         cache(args)
-    case "bridge":
-        bridge(args)
+    case "latest-version":
+        latest_version(args)
+    case "update":
+        update(args)
+    case "install":
+        install(args)
+    case "cli":
+        cli(args)
+    case _ if args.command in Proton.SERVICE_COMMANDS:
+        service(args)
     case _:
         parser.print_help()
